@@ -27,26 +27,14 @@ Y el agente:
 ---
 
 ## Arquitectura del agente
-Usuario (lenguaje natural)
-↓
-Claude API (claude-sonnet-4-5)
 
-System prompt especializado
-Tool definitions
-↓
-┌────────────────────────────┐
-│   Ciclo agentico (loop)    │
-│                            │
-│  Claude decide tool_use    │
-│         ↓                  │
-│  executor.py ejecuta tool  │
-│         ↓                  │
-│  resultado → Claude        │
-│         ↓                  │
-│  stop_reason = end_turn    │
-└────────────────────────────┘
-↓
-Respuesta ejecutiva en español
+1. **Usuario** escribe una pregunta en lenguaje natural
+2. **Claude API** analiza la pregunta con el system prompt especializado
+3. **Tool use** — Claude decide llamar `execute_bigquery_query` con el SQL generado
+4. **executor.py** ejecuta la query real en BigQuery y retorna los resultados
+5. **Claude** lee los resultados y redacta la respuesta ejecutiva en español
+
+El agente puede encadenar múltiples tool calls por pregunta (inspeccionar esquema → ejecutar query → responder).
 
 
 ---
@@ -79,6 +67,8 @@ Este agente consume los marts del proyecto
 ---
 
 ## Estructura del proyecto
+
+```
 agent-conversacional/
 ├── agent/
 │   ├── agent.py       # Ciclo agentico principal (loop tool use)
@@ -87,9 +77,7 @@ agent-conversacional/
 ├── main.py            # Interfaz CLI conversacional
 ├── requirements.txt
 └── .env               # ANTHROPIC_API_KEY (no incluido en repo)
-
----
-
+```
 ## Cómo ejecutarlo
 
 ```bash
@@ -108,28 +96,42 @@ gcloud auth application-default login \
 python main.py
 ```
 
-### Ejemplo de sesión
+## Ejemplo de sesión
+
+**Pregunta:**
+```
 HR > ¿Qué bases tienen riesgo crítico de dotación este mes?
+```
+
+**Ciclo agentico (visible en terminal):**
+```
 [Iteración 1] Consultando a Claude...
 [Stop reason] tool_use
 [Tool call] execute_bigquery_query
-[BQ] Bases con estado CRÍTICO en junio 2027
-[SQL] SELECT base_code, gap_vs_minimum, pct_weeks_critical ...
-[OK] 3 filas retornadas
+  [BQ] Bases con estado CRÍTICO en junio 2027
+  [SQL] SELECT base_code, gap_vs_minimum, pct_weeks_critical ...
+  [OK] 3 filas retornadas
+
 [Iteración 2] Consultando a Claude...
 [Stop reason] end_turn
-AGENTE:
+```
+
+**Respuesta del agente:**
+```
 Encontré 3 bases en estado CRÍTICO este mes:
 
-Santiago (SCL): déficit de 38 FTE — 72% de semanas críticas
-Roles urgentes: Piloto Comandante, Copiloto, Técnico Mantenimiento
-Buenos Aires (EZE): déficit de 16 FTE — 61% de semanas críticas
-Roles urgentes: Tripulante de Cabina, Copiloto
-Caracas (CCS): déficit de 7 FTE — 55% de semanas críticas
-Roles urgentes: Piloto Comandante
+- Santiago (SCL): déficit de 38 FTE — 72% de semanas críticas
+  Roles urgentes: Piloto Comandante, Copiloto, Técnico Mantenimiento
+
+- Buenos Aires (EZE): déficit de 16 FTE — 61% de semanas críticas
+  Roles urgentes: Tripulante de Cabina, Copiloto
+
+- Caracas (CCS): déficit de 7 FTE — 55% de semanas críticas
+  Roles urgentes: Piloto Comandante
 
 Recomendación: iniciar convocatoria inmediata para Pilotos Comandante
 y Copilotos en SCL y EZE antes del 15 de junio.
+```
 
 ---
 
